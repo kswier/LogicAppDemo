@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "workflows_LogicAppDemo2_name": {
-      "value": "LogicAppProd"
+      "value": "LogicAppProduction"
     }
   }
 }
