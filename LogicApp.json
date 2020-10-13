@@ -1,0 +1,184 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workflows_LogicAppDemo2_name": {
+      "defaultValue": "LogicAppDemo2",
+      "type": "String"
+    },
+    "connections_office365_externalid": {
+      "defaultValue": "/subscriptions/b2becb4d-1664-48c3-a742-19c3847899cb/resourceGroups/Sandbox/providers/Microsoft.Web/connections/office365",
+      "type": "String"
+    },
+    "connections_onedrive_externalid": {
+      "defaultValue": "/subscriptions/b2becb4d-1664-48c3-a742-19c3847899cb/resourceGroups/Sandbox/providers/Microsoft.Web/connections/onedrive",
+      "type": "String"
+    },
+    "LogicAppLocation": {
+      "type": "string",
+      "minLength": 1,
+      "allowedValues": [
+        "[resourceGroup().location]",
+        "southcentralus"
+      ],
+      "defaultValue": "southcentralus"
+    },
+    "onedrive_1_Connection_Name": {
+      "type": "string",
+      "defaultValue": "onedrive"
+    },
+    "onedrive_1_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "kswier@hotmail.com"
+    },
+    "office365_1_Connection_Name": {
+      "type": "string",
+      "defaultValue": "office365"
+    },
+    "office365_1_Connection_DisplayName": {
+      "type": "string",
+      "defaultValue": "kaswiere@microsoft.com"
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2017-07-01",
+      "name": "[parameters('workflows_LogicAppDemo2_name')]",
+      "location": "[parameters('LogicAppLocation')]",
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "actions": {
+            "For_each": {
+              "type": "Foreach",
+              "foreach": "@triggerBody()?['attachments']",
+              "actions": {
+                "Create_file": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['onedrive']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "body": "@items('For_each')",
+                    "path": "/datasets/default/files",
+                    "queries": {
+                      "folderPath": "/Email attachments",
+                      "name": "@items('For_each')?['name']"
+                    }
+                  },
+                  "runAfter": {},
+                  "runtimeConfiguration": {
+                    "contentTransfer": {
+                      "transferMode": "Chunked"
+                    }
+                  }
+                }
+              },
+              "runAfter": {}
+            }
+          },
+          "parameters": {
+            "$connections": {
+              "defaultValue": {},
+              "type": "Object"
+            }
+          },
+          "triggers": {
+            "When_a_new_email_arrives_(V3)": {
+              "type": "ApiConnectionNotification",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['office365_1']['connectionId']"
+                  }
+                },
+                "fetch": {
+                  "queries": {
+                    "folderPath": "Inbox",
+                    "importance": "Any",
+                    "fetchOnlyWithAttachment": false,
+                    "includeAttachments": true
+                  },
+                  "pathTemplate": {
+                    "template": "/v3/Mail/OnNewEmail"
+                  },
+                  "method": "get"
+                },
+                "subscribe": {
+                  "queries": {
+                    "folderPath": "Inbox",
+                    "importance": "Any",
+                    "fetchOnlyWithAttachment": false
+                  },
+                  "body": {
+                    "NotificationUrl": "@{listCallbackUrl()}"
+                  },
+                  "pathTemplate": {
+                    "template": "/GraphMailSubscriptionPoke/$subscriptions"
+                  },
+                  "method": "post"
+                }
+              },
+              "splitOn": "@triggerBody()?['value']"
+            }
+          },
+          "contentVersion": "1.0.0.0",
+          "outputs": {}
+        },
+        "parameters": {
+          "$connections": {
+            "value": {
+              "onedrive": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('LogicAppLocation'), '/managedApis/', 'onedrive')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('onedrive_1_Connection_Name'))]",
+                "connectionName": "[parameters('onedrive_1_Connection_Name')]"
+              },
+              "office365_1": {
+                "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('LogicAppLocation'), '/managedApis/', 'office365')]",
+                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('office365_1_Connection_Name'))]",
+                "connectionName": "[parameters('office365_1_Connection_Name')]"
+              }
+            }
+          }
+        }
+      },
+      "tags": {
+        "displayName": "LogicApp"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/connections', parameters('onedrive_1_Connection_Name'))]",
+        "[resourceId('Microsoft.Web/connections', parameters('office365_1_Connection_Name'))]"
+      ]
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2018-07-01-preview",
+      "name": "[parameters('onedrive_1_Connection_Name')]",
+      "location": "[parameters('LogicAppLocation')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('LogicAppLocation'), '/managedApis/', 'onedrive')]"
+        },
+        "displayName": "[parameters('onedrive_1_Connection_DisplayName')]"
+      }
+    },
+    {
+      "type": "MICROSOFT.WEB/CONNECTIONS",
+      "apiVersion": "2018-07-01-preview",
+      "name": "[parameters('office365_1_Connection_Name')]",
+      "location": "[parameters('LogicAppLocation')]",
+      "properties": {
+        "api": {
+          "id": "[concat(subscription().id, '/providers/Microsoft.Web/locations/', parameters('LogicAppLocation'), '/managedApis/', 'office365')]"
+        },
+        "displayName": "[parameters('office365_1_Connection_DisplayName')]"
+      }
+    }
+  ]
+}
